@@ -1,0 +1,275 @@
+import pandas as pd
+import datetime
+import json
+import os
+import requests
+import random
+import base64
+import pandas as pd
+from time import sleep
+import sys
+import time
+import logging
+
+# Your existing code...
+
+def process_trade_data(all_trades_data):
+    if all_trades_data is None or len(all_trades_data) == 0:
+        return None
+
+    df = pd.DataFrame(all_trades_data)
+    columns_to_convert = ['mkt', 'bsFlg', 'proCli', 'actTyp', 'TCd', 'booktype', 'trdTm', 'ordTm', 'expDt']
+    for column in columns_to_convert:
+        df[column] = df[column].astype(int)
+
+    def get_date_from_jiffy(dt_val):
+        return datetime.datetime.fromtimestamp(int(dt_val) / 65536 + 315513000)
+
+    df['time_'] = df['trdTm'].apply(get_date_from_jiffy)
+    df['expDt'] = pd.to_datetime(df['expDt'], unit='s', origin='1970-01-01') + pd.DateOffset(years=10)
+    df['ordTm'] = pd.to_datetime(df['ordTm'], unit='s', origin='1970-01-01') + pd.DateOffset(years=10)
+
+    mappings = {
+        'mkt': {1: "Normal", 2: "Odd Lot", 3: "Spot", 4: "Auction", 5: "Call Auction 1", 6: "Call Auction 2"},
+        'bsFlg': {1: "BUY", 2: "SELL"},
+        'proCli': {1: "Cli", 2: "Pro"},
+        'actTyp': {
+            2: "Original_Trade", 7: "Trade_cancellation", 101: "buy_participant_modification",
+            102: "sell_participant_modification", 103: "buy&sell_participant_modification",
+            104: "quantity_modification", 105: "buy_Acc.no_modify", 106: "sell_acc.no_modify",
+            107: "buy&sell_acc.no_modify", 109: "buy_trade_cancellation_due_to_modify",
+            110: "sell_participant_cancel_due_to_modify", 111: "sell_trade_cancel_due_to_modification"
+        },
+        'TCd': {
+            6001: "original_trade", 5525: "trade_modification_approval", 5565: "control_trade_modification",
+            5520: "Trade_cancellation_approval", 5560: "control_trade_cancellation",
+            5530: "Trade_cancellation_rejection", 5445: "Trade_modification_(client_modification)",
+            5440: "Trade_cancellation"
+        },
+        'booktype': {
+            1: "Regular_lot", 2: "special_term", 3: "stoploss/MIT", 4: "Negative_trade",
+            5: "odd_lot", 6: "spot", 7: "auction", 11: "call_auction_1", 12: "call_auction_2"
+        },
+        'status': {'P': "PENDING", 'R': "Rejected", 'A': "Approve"},
+        'optType': {'CA': "Call_American", 'PA': "Put_American", 'CE': "Call_European", 'PE': "Put_European"}
+    }
+
+    for col, mapping in mappings.items():
+        if col in df.columns:
+            df[col] = df[col].map(mapping).fillna("unknown")
+
+    df.rename(columns={
+        'mkt': 'Market', 'bsFlg': 'Buy_Sell', 'proCli': 'Client_Type', 'actTyp': 'Activity_Type',
+        'TCd': 'Transaction_Code', 'booktype': 'Book_Type', 'status': 'Trade_Status', 'optType': 'Option_Type'
+    }, inplace=True)
+
+    return df
+
+def basve():
+    numran = random.randint(0, 999999)
+    current_datetime = datetime.datetime.now()
+    formatted_datetime = current_datetime.strftime("%d%m%Y%H%M%S%f")[:-3]
+    d = formatted_datetime + ":" + str(numran)
+    date = d.encode('utf-8')
+    base64_encoded_datetime = base64.b64encode(date)
+    base = base64_encoded_datetime.decode('utf-8')
+    return base
+
+reesult = basve()
+token = []
+
+def get_last_printed_number():
+    try:
+        with open(f"TRADE_last_printed.txt", "r") as file:
+            last_printed_date_str, last_printed_number_str = file.readline().strip().split(",")
+            last_printed_date = datetime.datetime.strptime(
+                last_printed_date_str, "%Y-%m-%d").date()
+            last_printed_number = int(last_printed_number_str)
+            return last_printed_date, last_printed_number
+    except FileNotFoundError:
+        return None, None
+    except Exception as e:
+        print("Error occurred while reading last printed number:", e)
+        return None, None
+
+def save_last_printed_number(date, number):
+    with open(f"TRADE_last_printed.txt", "w") as file:
+        file.write(f"{date.strftime('%Y-%m-%d')},{number:07d}")
+
+def print_sequence():
+    last_printed_date, last_printed_number = get_last_printed_number()
+    today = datetime.datetime.now().date()
+
+    if last_printed_date is None or last_printed_date < today:
+            number_to_print = 1
+            last = 0
+            with open('sq.txt', 'w') as file:
+                file.write(str(last))
+    else:
+        number_to_print = last_printed_number + 1
+
+    print("Printing sequence starting from:", f"{number_to_print:07d}")
+    upper_limit = number_to_print + 1
+    for i in range(number_to_print, upper_limit):
+        print(f"{i:07d}")
+    save_last_printed_number(today, upper_limit - 1)
+
+    return f"{upper_limit - 1:07d}"
+
+value = print_sequence()
+
+def send_inquiry_request(url, data, headers):
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        return response
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP Error: {e}")
+        return response
+
+with open('TOKENCPY.txt', 'r') as file:
+    token1 = file.read()
+    print(token1)
+last = 0
+try:
+    with open('sq.txt', 'r') as file:
+        last = content = file.read()
+except FileNotFoundError:
+    print("File not found. Continuing with the script.")
+j = []
+last = int(last)
+print(last)
+current_date = datetime.datetime.now()
+k = datetime.date.today()
+formatted_date = current_date.strftime('%Y%m%d')
+ibc = '90224' + formatted_date + str(value)
+all_trades_data = []
+MAX_RETRIES = 1000
+RETRY_DELAY = 15
+for attempt in range(MAX_RETRIES):
+    UAT_URL = 'https://www.devconnect2nse.com/inquiry-fo/trades-inquiry'
+    HEADERS = {
+        'Authorization': f'Bearer {token1}',
+        'nonce': basve(),
+        'Content-Type': 'application/json'
+    }
+    DATA = {
+        "version": "1.0",
+        "data": {
+            "msgId": ibc,
+            "dataFormat": "CSV:CSV",
+            "tradesInquiry": f"{last},ALL"
+        }
+    }
+
+    # Send the request
+    json_data = send_inquiry_request(UAT_URL, DATA, HEADERS)
+
+    # Check the response status code
+    if json_data.status_code == 200:
+        response_data = json_data.json()
+        status = response_data.get("status")
+        messages_code = response_data.get("messages", {}).get("code")
+        msg_id = response_data.get("data", {}).get("msgId")
+        trades_inquiry = response_data.get("data", {}).get("tradesInquiry")
+        if trades_inquiry:
+            value = print_sequence()
+            trades = []
+            for trade_entry in trades_inquiry.split("^"):
+                trade_fields = trade_entry.split(",")
+
+                if len(trade_fields) >= 37:
+                    trade = {
+                        "seqNo": trade_fields[0],
+                        "mkt": trade_fields[1],
+                        "trdNo": trade_fields[2],
+                        "trdTm": trade_fields[3],
+                        "tkn": trade_fields[4],
+                        "trdQty": trade_fields[5],
+                        "trdPrc": trade_fields[6],
+                        "bsFlg": trade_fields[7],
+                        "ordNo": trade_fields[8],
+                        "brnCd": trade_fields[9],
+                        "usrId": trade_fields[10],
+                        "proCli": trade_fields[11],
+                        "cliActNo": trade_fields[12],
+                        "cpCd": trade_fields[13],
+                        "remarks": trade_fields[14],
+                        "actTyp": trade_fields[15],
+                        "TCd": trade_fields[16],
+                        "ordTm": trade_fields[17],
+                        "booktype": trade_fields[18],
+                        "oppTmCd": trade_fields[19],
+                        "ctclId": trade_fields[20],
+                        "status": trade_fields[21],
+                        "TmCd": trade_fields[22],
+                        "sym": trade_fields[23],
+                        "ser": trade_fields[24],
+                        "inst": trade_fields[25],
+                        "expDt": trade_fields[26],
+                        "strPrc": trade_fields[27],
+                        "optType": trade_fields[28],
+                        "fill1": trade_fields[29],
+                        "fill2": trade_fields[30],
+                        "fill3": trade_fields[31],
+                        "fill4": trade_fields[32],
+                        "fill5": trade_fields[33],
+                        "fill6": trade_fields[34],
+                        "fill7": trade_fields[35],
+                        "fill8": trade_fields[36]
+                    }
+                    trades.append(trade)
+
+            trades = pd.DataFrame(trades)
+            
+            df = process_trade_data(trades)
+            print(df)
+            re = pd.DataFrame(trades)
+            current_datetime1 = datetime.datetime.now().strftime("%Y-%m-%d")
+            file_path = f"tradeh{current_datetime1}.csv"
+            if df is not None:
+                if os.path.exists(file_path):
+                    df.to_csv(file_path, mode='a', header=False, index=False)
+                    re.to_csv("raw.csv", mode='a', header=False, index=False)
+                    logging.info("file_exist - Data appended")
+                else:
+                    df.to_csv(file_path, index=False)
+                    re.to_csv("raw.csv", index=False)
+                    logging.info("new_file - Data written")
+            else:
+                logging.error("df is None, cannot write to file")
+
+            data_str = str(DATA)
+            ab = str(last)
+            dbc = str(datetime.datetime.now())
+            with open(f'TRADE_msgid{k}.txt', 'a') as gfg:
+                gfg.writelines(data_str + dbc + '\n')
+            with open(f'TRADE_num{k}.txt', 'a') as gfg:
+                gfg.writelines(ab + '' + dbc + '\n')
+            last_trade = trades_inquiry.split(',')[4]
+            h = trades_inquiry.split(',')[1]
+            print(h)
+            last = last_trade
+            j.append(last)
+            ibc = '90224' + formatted_date + value
+            with open(f'sq.txt', 'w') as gfg:
+                gfg.write(last_trade)
+            current_time = datetime.datetime.now().time()
+            print(current_time)
+
+        target_time = datetime.time(15, 30)
+        if len(trades_inquiry) < 40:
+            print("Trades inquiry data is less than 40 characters. Exiting loop.")
+            
+        if current_time >= target_time:
+            print("Breaking the loop as the current time is 3:30 PM or later.")
+            break
+    else:
+        print(f"Attempt {attempt + 1} failed. Status code: {json_data.status_code}")
+        if attempt < MAX_RETRIES - 1:
+            print(f"Retrying in {RETRY_DELAY} seconds...")
+        else:
+            print("Max retries reached. Exiting.")
+    
+    # Add delay of 5 minutes before the next request
+    time.sleep(300)
